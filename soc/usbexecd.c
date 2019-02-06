@@ -115,9 +115,9 @@ typedef struct {
 typedef struct {
     int pid;
     pipebuf_t ctrl;
-    pipebuf_t stdin;
-    pipebuf_t stdout;
-    pipebuf_t stderr;
+    pipebuf_t _stdin;
+    pipebuf_t _stdout;
+    pipebuf_t _stderr;
 } procinfo_t;
 
 #define MAX_COMMAND_LEN 1024
@@ -724,9 +724,9 @@ void close_process(procinfo_t* p) {
 
     // Close out all of the pipe buffers if they haven't been closed already
     if ((&p->ctrl)->fd != -1) pipebuf_out_close(&p->ctrl, NO_FLUSH);
-    if ((&p->stdin)->fd != -1) pipebuf_out_close(&p->stdin, NO_FLUSH);
-    if ((&p->stdout)->fd != -1) pipebuf_in_close(&p->stdout, NO_FLUSH);
-    if ((&p->stderr)->fd != -1) pipebuf_in_close(&p->stderr, NO_FLUSH);
+    if ((&p->_stdin)->fd != -1) pipebuf_out_close(&p->_stdin, NO_FLUSH);
+    if ((&p->_stdout)->fd != -1) pipebuf_in_close(&p->_stdout, NO_FLUSH);
+    if ((&p->_stderr)->fd != -1) pipebuf_in_close(&p->_stderr, NO_FLUSH);
     // Free the process memory
     free(p);
     // Reset the pointer (may not be necessary)
@@ -783,11 +783,11 @@ void handle_socket_readable() {
 
             // Create a writable pipebuf and return the readable pipe for the child process
             int ctrl_fd   = pipebuf_out_init (&p->ctrl,   id, 0);
-            int stdin_fd  = pipebuf_out_init (&p->stdin,  id, 1);
+            int stdin_fd  = pipebuf_out_init (&p->_stdin,  id, 1);
 
             // Create a readable pipebuf and return the writable pipe for the child process
-            int stdout_fd = pipebuf_in_init(&p->stdout, id, 2);
-            int stderr_fd = pipebuf_in_init(&p->stderr, id, 3);
+            int stdout_fd = pipebuf_in_init(&p->_stdout, id, 2);
+            int stderr_fd = pipebuf_in_init(&p->_stderr, id, 3);
 
             int pid;
             // Fork the child process, if this is the child process
@@ -802,9 +802,9 @@ void handle_socket_readable() {
                     if (parent_process) {
                         // Close all of the file descriptors for this child
                         if ((&parent_process->ctrl)->fd != -1) close((&parent_process->ctrl)->fd);
-                        if ((&parent_process->stdin)->fd != -1) close((&parent_process->stdin)->fd);
-                        if ((&parent_process->stdout)->fd != -1) close((&parent_process->stdout)->fd);
-                        if ((&parent_process->stderr)->fd != -1) close((&parent_process->stderr)->fd);
+                        if ((&parent_process->_stdin)->fd != -1) close((&parent_process->_stdin)->fd);
+                        if ((&parent_process->_stdout)->fd != -1) close((&parent_process->_stdout)->fd);
+                        if ((&parent_process->_stderr)->fd != -1) close((&parent_process->_stderr)->fd);
                     }
                 }
 
@@ -860,17 +860,17 @@ void handle_socket_readable() {
 
         case CMD_WRITE_STDIN:
             debug("CMD: Write to STDIN buf of process with id %d", id);
-            pipebuf_out_to_internal_buffer(&p->stdin, header[3] | (header[2] << 8));
+            pipebuf_out_to_internal_buffer(&p->_stdin, header[3] | (header[2] << 8));
             break;
 
         case CMD_ACK_STDOUT:
             debug("CMD: Add more credits to stdout of process with id %d", id);
-            pipebuf_in_ack(&p->stdout, header[3]);
+            pipebuf_in_ack(&p->_stdout, header[3]);
             break;
 
         case CMD_ACK_STDERR:
             debug("CMD: Add more credits to stderr of process with id %d", id);
-            pipebuf_in_ack(&p->stderr, header[3]);
+            pipebuf_in_ack(&p->_stderr, header[3]);
             break;
 
         case CMD_CLOSE_CONTROL:
@@ -880,17 +880,17 @@ void handle_socket_readable() {
 
         case CMD_CLOSE_STDIN:
             debug("CMD: Close STDIN of process with id %d", id);
-            pipebuf_out_close(&p->stdin, FLUSH);
+            pipebuf_out_close(&p->_stdin, FLUSH);
             break;
 
         case CMD_CLOSE_STDOUT:
             debug("CMD: Close STDOUT of process with id %d", id);
-            pipebuf_in_close(&p->stdout, FLUSH);
+            pipebuf_in_close(&p->_stdout, FLUSH);
             break;
 
         case CMD_CLOSE_STDERR:
             debug("CMD: Close STDERR of process with id %d", id);
-            pipebuf_in_close(&p->stderr, FLUSH);
+            pipebuf_in_close(&p->_stderr, FLUSH);
             break;
     }
 }
